@@ -78,13 +78,15 @@ function initSocket() {
   });
 
   socket.on('roomJoined', ({ roomCode: rc, symbol, playerName, rejoined }) => {
-    mySymbol = symbol;
-    myName = playerName;
-    roomCode = rc;
-    if (rejoined) showToast(`Welcome back, ${playerName}!`, 'info');
-    SoundEngine.play('join');
-  });
+  mySymbol = symbol;
+  myName = playerName;
+  roomCode = rc;
 
+  showScreen('lobby'); // <-- add this
+
+  if (rejoined) showToast(`Welcome back, ${playerName}!`, 'info');
+  SoundEngine.play('join');
+});
   socket.on('gameState', (state) => {
     gameState = state;
     if (state.status === 'playing' || state.status === 'finished') {
