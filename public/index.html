@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TicTacToe PS — Online Multiplayer</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✕</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ═══════════ LOADING SCREEN ═══════════ -->
+<div id="loadingScreen" class="screen active">
+  <div class="loading-content">
+    <div class="ps-badge">GAME CREATED BY PS</div>
+    <div class="loading-logo">
+      <div class="logo-grid">
+        <div class="lg-cell">✕</div><div class="lg-cell"></div><div class="lg-cell">○</div>
+        <div class="lg-cell"></div><div class="lg-cell lg-x">✕</div><div class="lg-cell"></div>
+        <div class="lg-cell">○</div><div class="lg-cell"></div><div class="lg-cell lg-o">○</div>
+      </div>
+    </div>
+    <h1 class="game-title">TIC<span>TAC</span>TOE</h1>
+    <div class="loading-bar-wrap"><div class="loading-bar" id="loadingBar"></div></div>
+    <p class="loading-text" id="loadingText">Initializing game...</p>
+  </div>
+</div>
+
+<!-- ═══════════ HOME SCREEN ═══════════ -->
+<div id="homeScreen" class="screen">
+  <div class="screen-bg"></div>
+  <div class="home-content">
+    <div class="ps-badge top-badge">GAME CREATED BY PS</div>
+    <div class="home-logo">
+      <div class="logo-grid sm">
+        <div class="lg-cell">✕</div><div class="lg-cell"></div><div class="lg-cell">○</div>
+        <div class="lg-cell"></div><div class="lg-cell">✕</div><div class="lg-cell"></div>
+        <div class="lg-cell">○</div><div class="lg-cell"></div><div class="lg-cell">○</div>
+      </div>
+    </div>
+    <h1 class="game-title sm">TIC<span>TAC</span>TOE</h1>
+    <p class="subtitle">Online Multiplayer</p>
+
+    <div class="name-input-wrap">
+      <label for="playerNameInput">YOUR NAME</label>
+      <input type="text" id="playerNameInput" placeholder="Enter your name..." maxlength="20" autocomplete="off" spellcheck="false" />
+    </div>
+
+    <div class="home-buttons">
+      <button class="btn btn-primary" id="createRoomBtn">
+        <span class="btn-icon">⊕</span>
+        <span>Create Room</span>
+      </button>
+      <button class="btn btn-secondary" id="showJoinBtn">
+        <span class="btn-icon">⤵</span>
+        <span>Join Room</span>
+      </button>
+    </div>
+
+    <div class="join-panel" id="joinPanel">
+      <label for="roomCodeInput">ROOM CODE</label>
+      <input type="text" id="roomCodeInput" placeholder="Enter 6-digit code..." maxlength="6" autocomplete="off" spellcheck="false" />
+      <button class="btn btn-accent" id="joinRoomBtn">
+        <span class="btn-icon">▶</span>
+        <span>Join Game</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ LOBBY SCREEN ═══════════ -->
+<div id="lobbyScreen" class="screen">
+  <div class="screen-bg"></div>
+  <div class="lobby-content">
+    <div class="ps-badge top-badge">GAME CREATED BY PS</div>
+    <h2 class="section-title">ROOM LOBBY</h2>
+    <div class="room-code-card">
+      <p class="rcc-label">ROOM CODE</p>
+      <div class="rcc-code" id="displayRoomCode">------</div>
+      <button class="btn-copy" id="copyCodeBtn" title="Copy code">
+        <span>⎘ Copy</span>
+      </button>
+    </div>
+    <div class="waiting-players">
+      <div class="player-slot" id="slot-x">
+        <div class="slot-symbol x-sym">✕</div>
+        <div class="slot-info">
+          <span class="slot-name" id="slot-x-name">Waiting...</span>
+          <span class="slot-badge">Player X</span>
+        </div>
+        <div class="slot-status" id="slot-x-status">○</div>
+      </div>
+      <div class="vs-text">VS</div>
+      <div class="player-slot" id="slot-o">
+        <div class="slot-symbol o-sym">○</div>
+        <div class="slot-info">
+          <span class="slot-name" id="slot-o-name">Waiting...</span>
+          <span class="slot-badge">Player O</span>
+        </div>
+        <div class="slot-status" id="slot-o-status">○</div>
+      </div>
+    </div>
+    <div class="waiting-indicator" id="waitingIndicator">
+      <div class="pulse-dot"></div>
+      <span>Waiting for opponent...</span>
+    </div>
+    <p class="share-hint">Share the room code with your friend!</p>
+  </div>
+</div>
+
+<!-- ═══════════ GAME SCREEN ═══════════ -->
+<div id="gameScreen" class="screen">
+  <div class="screen-bg"></div>
+
+  <!-- Header -->
+  <header class="game-header">
+    <div class="player-hud" id="hud-x">
+      <div class="hud-symbol x-sym">✕</div>
+      <div class="hud-info">
+        <span class="hud-name" id="hud-x-name">Player X</span>
+        <span class="hud-score" id="hud-x-score">0</span>
+      </div>
+      <div class="hud-status online" id="hud-x-dot" title="Online"></div>
+    </div>
+
+    <div class="turn-indicator" id="turnIndicator">
+      <div class="turn-symbol" id="turnSymbol">✕</div>
+      <span id="turnText">Your turn</span>
+    </div>
+
+    <div class="player-hud right" id="hud-o">
+      <div class="hud-status online" id="hud-o-dot" title="Online"></div>
+      <div class="hud-info">
+        <span class="hud-name" id="hud-o-name">Player O</span>
+        <span class="hud-score" id="hud-o-score">0</span>
+      </div>
+      <div class="hud-symbol o-sym">○</div>
+    </div>
+  </header>
+
+  <!-- Board -->
+  <main class="board-area">
+    <div class="board" id="board">
+      <div class="board-lines">
+        <div class="bl bl-v1"></div><div class="bl bl-v2"></div>
+        <div class="bl bl-h1"></div><div class="bl bl-h2"></div>
+      </div>
+      <div class="board-cells" id="boardCells">
+        <div class="cell" data-index="0"></div>
+        <div class="cell" data-index="1"></div>
+        <div class="cell" data-index="2"></div>
+        <div class="cell" data-index="3"></div>
+        <div class="cell" data-index="4"></div>
+        <div class="cell" data-index="5"></div>
+        <div class="cell" data-index="6"></div>
+        <div class="cell" data-index="7"></div>
+        <div class="cell" data-index="8"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer actions -->
+  <footer class="game-footer">
+    <button class="btn btn-sm" id="openHistoryBtn">📋 History</button>
+    <button class="btn btn-sm active" id="openChatBtn">💬 Chat <span class="chat-badge hidden" id="chatBadge">0</span></button>
+    <button class="btn btn-sm" id="leaveGameBtn">✕ Leave</button>
+  </footer>
+
+  <!-- Result overlay -->
+  <div class="result-overlay hidden" id="resultOverlay">
+    <div class="result-card">
+      <div class="result-icon" id="resultIcon">🏆</div>
+      <div class="result-title" id="resultTitle">You Win!</div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="result-actions">
+        <button class="btn btn-primary" id="rematchBtn">⟳ Rematch</button>
+        <button class="btn btn-secondary" id="leaveResultBtn">← Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rematch waiting -->
+  <div class="rematch-toast hidden" id="rematchToast">Waiting for opponent to accept rematch...</div>
+  <div class="rematch-toast" id="rematchReqToast" style="display:none">Opponent wants a rematch! <button class="btn btn-xs" id="acceptRematchBtn">Accept</button></div>
+
+  <!-- Chat panel -->
+  <div class="side-panel" id="chatPanel">
+    <div class="panel-header">
+      <span>💬 Chat</span>
+      <button class="panel-close" id="closeChatBtn">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="typing-indicator hidden" id="typingIndicator">
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+      <span id="typingName">Opponent</span> is typing...
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200" autocomplete="off" />
+      <button class="btn-send" id="sendChatBtn">▶</button>
+    </div>
+  </div>
+
+  <!-- History panel -->
+  <div class="side-panel" id="historyPanel">
+    <div class="panel-header">
+      <span>📋 Match History</span>
+      <button class="panel-close" id="closeHistoryBtn">✕</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <!-- Panel backdrop -->
+  <div class="panel-backdrop hidden" id="panelBackdrop"></div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
