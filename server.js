@@ -15,16 +15,17 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── In-memory game state ───────────────────────────────────────────────────
-const rooms = {}; // roomCode -> Room
+const rooms = {};
 
 function createRoom(roomCode) {
   return {
     code: roomCode,
-    players: [],          // [{id, name, symbol, score, connected}]
+    players: [],
     board: Array(9).fill(null),
     currentTurn: 'X',
-    status: 'waiting',    // waiting | playing | finished
+    status: 'waiting',
     winner: null,
+    winLine: [],
     matchHistory: [],
     createdAt: Date.now()
   };
@@ -78,9 +79,8 @@ function minimax(board, isMaximizing, botSymbol, humanSymbol) {
   if (result) {
     if (result.winner === botSymbol) return 10;
     if (result.winner === humanSymbol) return -10;
-    return 0; // draw
+    return 0;
   }
-
   if (isMaximizing) {
     let best = -Infinity;
     for (let i = 0; i < 9; i++) {
@@ -112,16 +112,13 @@ function getBotMove(board, botSymbol, humanSymbol) {
       board[i] = botSymbol;
       const score = minimax(board, false, botSymbol, humanSymbol);
       board[i] = null;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = i;
-      }
+      if (score > bestScore) { bestScore = score; bestMove = i; }
     }
   }
   return bestMove;
 }
 
-// ─── Socket.IO events ───────────────────────────────────────────────────────
+// ─── Socket.IO ───────────────────────────────────────────────────────────────
 io.on('connection', socket => {
   console.log('Connected:', socket.id);
 
@@ -131,13 +128,11 @@ io.on('connection', socket => {
     const code = generateRoomCode();
     rooms[code] = createRoom(code);
     const room = rooms[code];
-
     const player = { id: socket.id, name, symbol: 'X', score: 0, connected: true };
     room.players.push(player);
     socket.join(code);
     socket.roomCode = code;
     socket.playerName = name;
-
     socket.emit('roomCreated', { roomCode: code, symbol: 'X', playerName: name });
     socket.emit('gameState', getRoomState(room));
     console.log(`Room ${code} created by ${name}`);
@@ -196,12 +191,12 @@ io.on('connection', socket => {
     console.log(`${name} joined room ${code}`);
   });
 
-  // ── Make Move (Multiplayer) ──
+  // ── Make Move (Multiplayer only) ──
   socket.on('makeMove', ({ index }) => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
-
+    if (room.isBot) return; // bot game mein ye use nahi hoga
     if (room.status !== 'playing') return;
     if (room.board[index] !== null) return;
 
@@ -215,12 +210,10 @@ io.on('connection', socket => {
       room.status = 'finished';
       room.winner = result.winner;
       room.winLine = result.line;
-
       if (result.winner !== 'draw') {
         const winner = room.players.find(p => p.symbol === result.winner);
         if (winner) winner.score += 1;
       }
-
       room.matchHistory.unshift({
         id: uuidv4(),
         winner: result.winner === 'draw' ? 'Draw' : room.players.find(p => p.symbol === result.winner)?.name,
@@ -231,7 +224,6 @@ io.on('connection', socket => {
     } else {
       room.currentTurn = room.currentTurn === 'X' ? 'O' : 'X';
     }
-
     io.to(code).emit('gameState', getRoomState(room));
   });
 
@@ -261,7 +253,7 @@ io.on('connection', socket => {
     }
   });
 
-  // ── Chat Message ──
+  // ── Chat ──
   socket.on('chatMessage', ({ text }) => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
@@ -269,15 +261,10 @@ io.on('connection', socket => {
     if (!msg) return;
     const player = rooms[code].players.find(p => p.id === socket.id);
     const name = player ? player.name : 'Unknown';
-    io.to(code).emit('chatMessage', {
-      from: name,
-      symbol: player?.symbol,
-      text: msg,
-      ts: Date.now()
-    });
+    io.to(code).emit('chatMessage', { from: name, symbol: player?.symbol, text: msg, ts: Date.now() });
   });
 
-  // ── Typing indicator ──
+  // ── Typing ──
   socket.on('typing', ({ isTyping }) => {
     const code = socket.roomCode;
     if (!code) return;
@@ -286,15 +273,10 @@ io.on('connection', socket => {
     socket.to(code).emit('opponentTyping', { name: player.name, isTyping });
   });
 
-  // ════════════════════════════════════════════════════
-  // ── BOT GAME EVENTS ──────────────────────────────────
-  // ════════════════════════════════════════════════════
-
-  // Player "vs Bot" select karta hai
+  // ── Create Bot Room ──
   socket.on('createBotRoom', ({ playerName }) => {
     const name = (playerName || 'Player').trim().slice(0, 20);
     const code = 'BOT_' + socket.id.slice(0, 8);
-
     const room = {
       code,
       isBot: true,
@@ -309,28 +291,17 @@ io.on('connection', socket => {
       winLine: [],
       matchHistory: []
     };
-
     rooms[code] = room;
     socket.join(code);
     socket.roomCode = code;
     socket.playerName = name;
-
     socket.emit('roomJoined', { roomCode: code, symbol: 'X', playerName: name, isBot: true });
     socket.emit('gameState', getRoomState(room));
-    socket.emit('chatMessage', {
-      system: true,
-      text: `Game vs Bot started! ${name} (X) goes first.`,
-      ts: Date.now()
-    });
-
+    socket.emit('chatMessage', { system: true, text: `Game vs Bot started! ${name} (X) goes first.`, ts: Date.now() });
     console.log(`Bot room created for ${name}`);
   });
 
-  // Player ka move (bot game mein bhi same 'makeMove' use hoga)
-  // Isliye makeMove ko modify kiya hai — bot room detect hoga
-  // Upar wala makeMove already handle karta hai human ka move
-  // Neeche bot ka auto-response add kiya hai:
-
+  // ── Bot Move ──
   socket.on('makeBotMove', ({ index }) => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
@@ -338,9 +309,8 @@ io.on('connection', socket => {
     if (!room.isBot) return;
     if (room.status !== 'playing') return;
     if (room.board[index] !== null) return;
-    if (room.currentTurn !== 'X') return; // sirf human ki baari pe
+    if (room.currentTurn !== 'X') return;
 
-    // Human ka move
     room.board[index] = 'X';
     let result = checkWinner(room.board);
 
@@ -349,6 +319,7 @@ io.on('connection', socket => {
       room.winner = result.winner;
       room.winLine = result.line;
       if (result.winner === 'X') room.players[0].score += 1;
+      else if (result.winner === 'O') room.players[1].score += 1;
       room.matchHistory.unshift({
         id: uuidv4(),
         winner: result.winner === 'draw' ? 'Draw' : result.winner === 'X' ? room.players[0].name : '🤖 Bot',
@@ -360,16 +331,13 @@ io.on('connection', socket => {
     }
 
     room.currentTurn = 'O';
-    socket.emit('gameState', getRoomState(room)); // board update dikhao
+    socket.emit('gameState', getRoomState(room));
 
-    // Bot ka move — 600ms delay (natural lagta hai)
     setTimeout(() => {
       if (room.status !== 'playing') return;
-
       const botIndex = getBotMove([...room.board], 'O', 'X');
       room.board[botIndex] = 'O';
       result = checkWinner(room.board);
-
       if (result) {
         room.status = 'finished';
         room.winner = result.winner;
@@ -384,37 +352,33 @@ io.on('connection', socket => {
       } else {
         room.currentTurn = 'X';
       }
-
       socket.emit('gameState', getRoomState(room));
     }, 600);
   });
 
-  // Bot Rematch
+  // ── Bot Rematch ──
   socket.on('requestBotRematch', () => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
     if (!room.isBot) return;
-
     room.board = Array(9).fill(null);
     room.status = 'playing';
     room.winner = null;
     room.winLine = [];
     room.currentTurn = 'X';
-
     socket.emit('gameState', getRoomState(room));
     socket.emit('rematchStarted');
     socket.emit('chatMessage', { system: true, text: 'New game started! You go first.', ts: Date.now() });
   });
 
-  // ─── Disconnect ──────────────────────────────────────
+  // ── Disconnect ──
   socket.on('disconnect', () => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
 
     if (room.isBot) {
-      // Bot room turant delete
       delete rooms[code];
       return;
     }
@@ -437,8 +401,8 @@ io.on('connection', socket => {
   });
 });
 
-// ─── Health check ────────────────────────────────────────────────────────────
 app.get('/health', (_, res) => res.json({ status: 'ok', rooms: Object.keys(rooms).length }));
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+                                     
