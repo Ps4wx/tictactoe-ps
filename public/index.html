@@ -432,3 +432,153 @@
 
 </body>
 </html>
+match</button>
+        <button class="btn btn-secondary" id="leaveResultBtn">← Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rematch waiting -->
+  <div class="rematch-toast hidden" id="rematchToast">Waiting for opponent to accept rematch...</div>
+  <div class="rematch-toast" id="rematchReqToast" style="display:none">Opponent wants a rematch! <button class="btn btn-xs" id="acceptRematchBtn">Accept</button></div>
+
+  <!-- Chat panel -->
+  <div class="side-panel" id="chatPanel">
+    <div class="panel-header">
+      <span>💬 Chat</span>
+      <button class="panel-close" id="closeChatBtn">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="typing-indicator hidden" id="typingIndicator">
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+      <span id="typingName">Opponent</span> is typing...
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200" autocomplete="off" />
+      <button class="btn-send" id="sendChatBtn">▶</button>
+    </div>
+  </div>
+
+  <!-- History panel -->
+  <div class="side-panel" id="historyPanel">
+    <div class="panel-header">
+      <span>📋 Match History</span>
+      <button class="panel-close" id="closeHistoryBtn">✕</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <!-- Panel backdrop -->
+  <div class="panel-backdrop hidden" id="panelBackdrop"></div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/game.js"></script>
+
+<!-- ═══════════ MEME LOGIC ═══════════ -->
+<script>
+  // ── WIN memes ──
+  const WIN_MEMES = [
+    {
+      gif: 'https://media.tenor.com/LDSEECmMkTsAAAAC/cat-dancing.gif',
+      headline: '🔥 TERI MAA KI AANKH TU JEET GAYA! 🔥',
+      sub: 'Opponent ne controller phaink diya hoga 💀'
+    },
+    {
+      gif: 'https://media.tenor.com/beFLDPreQEIAAAAC/john-cena-you-cant-see-me.gif',
+      headline: 'BHAI TU TOH PRO NIKLA! 😤',
+      sub: 'Seedha national team mein bhej inhe 🏆'
+    },
+    {
+      gif: 'https://media.tenor.com/6Nl_oeJJqUcAAAAC/minions-celebrating.gif',
+      headline: 'W MAAR DIYA EKDUM! 🎉',
+      sub: 'Opponent abhi ro raha hoga ghar pe 😂'
+    },
+    {
+      gif: 'https://media.tenor.com/Ie1bpNhToIoAAAAC/party-celebration.gif',
+      headline: 'LEGEND HAI TU BHAI! 👑',
+      sub: 'Opponent ka WiFi accha nahi tha shayad 😅'
+    }
+  ];
+
+  // ── LOSE memes ──
+  const LOSE_MEMES = [
+    {
+      gif: 'https://media.tenor.com/lZOGTbMFtv0AAAAC/this-is-fine-dog.gif',
+      headline: 'HAAR GAYA? YE THEEK HAI... 😶🔥',
+      sub: 'Sab theek hai. Bilkul theek hai. 💀'
+    },
+    {
+      gif: 'https://media.tenor.com/G2-jIeNdL_kAAAAC/crying-cry.gif',
+      headline: 'BHAI SEEDHA SO JA AB 😭',
+      sub: 'Kal naya din, naya chance. Aaj toh gaya 💀'
+    },
+    {
+      gif: 'https://media.tenor.com/5F2MEs1-8bsAAAAC/why-crying.gif',
+      headline: 'RO MAT BHAI... 😂',
+      sub: 'Actually... ro le thoda. Better lagega 🥲'
+    },
+    {
+      gif: 'https://media.tenor.com/Un-h_niGCPkAAAAC/michael-scott-no.gif',
+      headline: 'NOOOOOO! 😱',
+      sub: 'Yahi toh duniya hai bhai. Chalte raho 🚶'
+    }
+  ];
+
+  // ── DRAW memes ──
+  const DRAW_MEMES = [
+    {
+      gif: 'https://media.tenor.com/URTJZ7Bj8WMAAAAC/spider-man-pointing.gif',
+      headline: 'DONO EQUAL BEKAR NIKLE! 🤝',
+      sub: 'Yaar koi nahi jeeta... koi nahi hara. Sad life 😐'
+    },
+    {
+      gif: 'https://media.tenor.com/YNi4sTb3EncAAAAC/handshake-shake.gif',
+      headline: 'DRAW? REALLY? 😶',
+      sub: 'Dono ne milke game waste kar diya 💀'
+    }
+  ];
+
+  function getRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function showMeme(type) {
+    let meme;
+    let emoji;
+    if (type === 'win') {
+      meme = getRandom(WIN_MEMES);
+      emoji = '🏆🎉🔥';
+    } else if (type === 'lose') {
+      meme = getRandom(LOSE_MEMES);
+      emoji = '💀😭🥲';
+    } else {
+      meme = getRandom(DRAW_MEMES);
+      emoji = '🤝😐💀';
+    }
+
+    document.getElementById('memeEmoji').textContent = emoji;
+    document.getElementById('memeGif').src = meme.gif;
+    document.getElementById('memeHeadline').textContent = meme.headline;
+    document.getElementById('memeSub').textContent = meme.sub;
+    document.getElementById('memeOverlay').classList.add('show');
+  }
+
+  document.getElementById('memeCloseBtn').addEventListener('click', () => {
+    document.getElementById('memeOverlay').classList.remove('show');
+  });
+
+  // ── game.js ke result se meme trigger karo ──
+  // game.js mein jab result aata hai wahan se window event fire hoga
+  window.addEventListener('gameResult', (e) => {
+    const { type } = e.detail; // 'win' | 'lose' | 'draw'
+    setTimeout(() => showMeme(type), 800); // thodi delay — result card pehle dikhe
+  });
+</script>
+
+</body>
+</html>
