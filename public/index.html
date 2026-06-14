@@ -81,13 +81,6 @@
       from { transform: rotate(-8deg) scale(1); }
       to   { transform: rotate(8deg) scale(1.15); }
     }
-    .btn-bot {
-      background: linear-gradient(135deg, #16a34a, #15803d);
-      color: #fff;
-      border: 1.5px solid #22c55e;
-      box-shadow: 0 0 16px rgba(34,197,94,0.25);
-    }
-    .btn-bot:hover { box-shadow: 0 0 28px rgba(34,197,94,0.45); transform: translateY(-1px); }
   </style>
 </head>
 <body>
@@ -140,24 +133,20 @@
     </div>
     <div class="home-buttons">
       <button class="btn btn-primary" id="createRoomBtn">
-        <span class="btn-icon">⊕</span>
-        <span>Create Room</span>
+        <span class="btn-icon">⊕</span><span>Create Room</span>
       </button>
       <button class="btn btn-bot" id="botBtn">
-        <span class="btn-icon">🤖</span>
-        <span>Play vs Bot</span>
+        <span class="btn-icon">🤖</span><span>Play vs Bot</span>
       </button>
       <button class="btn btn-secondary" id="showJoinBtn">
-        <span class="btn-icon">⤵</span>
-        <span>Join Room</span>
+        <span class="btn-icon">⤵</span><span>Join Room</span>
       </button>
     </div>
     <div class="join-panel" id="joinPanel">
       <label for="roomCodeInput">ROOM CODE</label>
       <input type="text" id="roomCodeInput" placeholder="Enter 6-digit code..." maxlength="6" autocomplete="off" spellcheck="false" />
       <button class="btn btn-accent" id="joinRoomBtn">
-        <span class="btn-icon">▶</span>
-        <span>Join Game</span>
+        <span class="btn-icon">▶</span><span>Join Game</span>
       </button>
     </div>
   </div>
@@ -172,9 +161,7 @@
     <div class="room-code-card">
       <p class="rcc-label">ROOM CODE</p>
       <div class="rcc-code" id="displayRoomCode">------</div>
-      <button class="btn-copy" id="copyCodeBtn" title="Copy code">
-        <span>⎘ Copy</span>
-      </button>
+      <button class="btn-copy" id="copyCodeBtn"><span>⎘ Copy</span></button>
     </div>
     <div class="waiting-players">
       <div class="player-slot" id="slot-x">
@@ -183,7 +170,7 @@
           <span class="slot-name" id="slot-x-name">Waiting...</span>
           <span class="slot-badge">Player X</span>
         </div>
-        <div class="slot-status" id="slot-x-status">○</div>
+        <div class="slot-status" id="slot-x-status"></div>
       </div>
       <div class="vs-text">VS</div>
       <div class="player-slot" id="slot-o">
@@ -192,7 +179,7 @@
           <span class="slot-name" id="slot-o-name">Waiting...</span>
           <span class="slot-badge">Player O</span>
         </div>
-        <div class="slot-status" id="slot-o-status">○</div>
+        <div class="slot-status" id="slot-o-status"></div>
       </div>
     </div>
     <div class="waiting-indicator" id="waitingIndicator">
@@ -213,14 +200,14 @@
         <span class="hud-name" id="hud-x-name">Player X</span>
         <span class="hud-score" id="hud-x-score">0</span>
       </div>
-      <div class="hud-status online" id="hud-x-dot" title="Online"></div>
+      <div class="hud-status online" id="hud-x-dot"></div>
     </div>
     <div class="turn-indicator" id="turnIndicator">
       <div class="turn-symbol" id="turnSymbol">✕</div>
       <span id="turnText">Your turn</span>
     </div>
     <div class="player-hud right" id="hud-o">
-      <div class="hud-status online" id="hud-o-dot" title="Online"></div>
+      <div class="hud-status online" id="hud-o-dot"></div>
       <div class="hud-info">
         <span class="hud-name" id="hud-o-name">Player O</span>
         <span class="hud-score" id="hud-o-score">0</span>
@@ -264,7 +251,9 @@
     </div>
   </div>
   <div class="rematch-toast hidden" id="rematchToast">Waiting for opponent to accept rematch...</div>
-  <div class="rematch-toast" id="rematchReqToast" style="display:none">Opponent wants a rematch! <button class="btn btn-xs" id="acceptRematchBtn">Accept</button></div>
+  <div class="rematch-toast" id="rematchReqToast" style="display:none">
+    Opponent wants a rematch! <button class="btn btn-xs" id="acceptRematchBtn">Accept</button>
+  </div>
   <div class="side-panel" id="chatPanel">
     <div class="panel-header">
       <span>💬 Chat</span>
@@ -298,7 +287,7 @@
 
 <script>
   const WIN_MEMES = [
-    { gif: 'https://media.tenor.com/LDSEECmMkTsAAAAC/cat-dancing.gif', headline: '🔥 TERI MAA KI AANKH TU JEET GAYA! 🔥', sub: 'Opponent ne controller phaink diya hoga 💀' },
+    { gif: 'https://media.tenor.com/LDSEECmMkTsAAAAC/cat-dancing.gif', headline: '🔥 TU JEET GAYA BHAI! 🔥', sub: 'Opponent ne controller phaink diya hoga 💀' },
     { gif: 'https://media.tenor.com/beFLDPreQEIAAAAC/john-cena-you-cant-see-me.gif', headline: 'BHAI TU TOH PRO NIKLA! 😤', sub: 'Seedha national team mein bhej inhe 🏆' },
     { gif: 'https://media.tenor.com/6Nl_oeJJqUcAAAAC/minions-celebrating.gif', headline: 'W MAAR DIYA EKDUM! 🎉', sub: 'Opponent abhi ro raha hoga ghar pe 😂' },
     { gif: 'https://media.tenor.com/Ie1bpNhToIoAAAAC/party-celebration.gif', headline: 'LEGEND HAI TU BHAI! 👑', sub: 'Opponent ka WiFi accha nahi tha shayad 😅' }
