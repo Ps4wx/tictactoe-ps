@@ -51,7 +51,7 @@ function runLoadingScreen() {
       text.textContent = 'Ready!';
       setTimeout(() => {
         initSocket();
-        initHome();       // ← FIX: initHome yahan call hota hai
+        initHome();
         showScreen('home');
       }, 500);
     }
@@ -244,7 +244,7 @@ document.getElementById('copyCodeBtn').addEventListener('click', () => {
 let gameUIInited = false;
 
 function initGameUI() {
-  if (gameUIInited) return;   // ← FIX: double-bind prevent karo
+  if (gameUIInited) return;
   gameUIInited = true;
 
   document.querySelectorAll('.cell').forEach(cell => {
@@ -585,4 +585,7 @@ function showToast(message, type = 'info', duration = 2500) {
   }, duration);
 }
 
-// ── START ───────────────────
+// ── START ───────────────────────────────────────────
+runLoadingScreen();
+
+})();
