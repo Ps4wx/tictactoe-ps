@@ -10,19 +10,16 @@ A real-time online multiplayer Tic-Tac-Toe game with built-in chat, scoreboard, 
 
 ```
 tictactoe/
-├── server.js              ← Node.js + Socket.IO server
-├── package.json           ← Dependencies and scripts
-├── render.yaml            ← Render deployment config
+├── server.js
+├── package.json
+├── render.yaml
 ├── .gitignore
-├── README.md
-└── public/                ← Static frontend files
-    ├── index.html         ← Main HTML (all screens)
-    ├── css/
-    │   └── style.css      ← Premium dark gaming styles
+└── public/
+    ├── index.html
+    ├── css/style.css
     └── js/
-        ├── sounds.js      ← Web Audio API sound engine
-        └── game.js        ← All client-side game logic
-```
+        ├── sounds.js
+        └── game.js
 
 ---
 
