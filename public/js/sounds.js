@@ -8,15 +8,14 @@ const SoundEngine = (() => {
 
   function getCtx() {
     if (!ctx) {
-      try {
-        ctx = new (window.AudioContext || window.webkitAudioContext)();
-      } catch(e) { return null; }
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e) { return null; }
     }
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     return ctx;
   }
 
-  function playTone({ freq = 440, type = 'sine', duration = 0.15, gain = 0.3, attack = 0.005, decay = 0.1, fadeStart = 0.05, startTime = 0 }) {
+  function playTone({ freq = 440, type = 'sine', duration = 0.15, gain = 0.3, attack = 0.005, fadeStart = 0.05, startTime = 0 }) {
     const c = getCtx();
     if (!c || !enabled) return;
     const t = c.currentTime + startTime;
