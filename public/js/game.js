@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  TicTacToe PS — Client Game Logic
+//  TicTacToe PS — Client Game Logic (with Bot + Memes)
 // ═══════════════════════════════════════════════════
 
 (() => {
@@ -16,6 +16,7 @@ let historyOpen = false;
 let unreadChats = 0;
 let typingTimer = null;
 let isTyping = false;
+let isBotGame = false;  // BOT MODE FLAG
 
 // ── Screens ────────────────────────────────────────
 const screens = {
@@ -77,20 +78,28 @@ function initSocket() {
     SoundEngine.play('click');
   });
 
-  socket.on('roomJoined', ({ roomCode: rc, symbol, playerName, rejoined }) => {
-  mySymbol = symbol;
-  myName = playerName;
-  roomCode = rc;
+  socket.on('roomJoined', ({ roomCode: rc, symbol, playerName, rejoined, isBot }) => {
+    mySymbol = symbol;
+    myName = playerName;
+    roomCode = rc;
+    isBotGame = !!isBot;
 
-  showScreen('lobby'); // <-- add this
+    if (isBotGame) {
+      // Bot game — seedha game screen pe
+      showScreen('game');
+      initGameUI();
+    } else {
+      showScreen('lobby');
+    }
 
-  if (rejoined) showToast(`Welcome back, ${playerName}!`, 'info');
-  SoundEngine.play('join');
-});
+    if (rejoined) showToast(`Welcome back, ${playerName}!`, 'info');
+    SoundEngine.play('join');
+  });
+
   socket.on('gameState', (state) => {
     gameState = state;
     if (state.status === 'playing' || state.status === 'finished') {
-      if (screens.game.classList.contains('active') === false && screens.lobby.classList.contains('active')) {
+      if (!screens.game.classList.contains('active') && screens.lobby.classList.contains('active')) {
         showScreen('game');
         initGameUI();
       }
@@ -140,23 +149,26 @@ function initSocket() {
     document.getElementById('rematchToast').classList.add('hidden');
     document.getElementById('rematchReqToast').style.display = 'none';
     clearBoardUI();
+    lastResultShown = null;
     SoundEngine.play('join');
   });
 }
 
 // ── Home Screen ────────────────────────────────────
 function initHome() {
-  const nameInput = document.getElementById('playerNameInput');
-  const createBtn = document.getElementById('createRoomBtn');
+  const nameInput   = document.getElementById('playerNameInput');
+  const createBtn   = document.getElementById('createRoomBtn');
   const showJoinBtn = document.getElementById('showJoinBtn');
-  const joinPanel = document.getElementById('joinPanel');
+  const joinPanel   = document.getElementById('joinPanel');
   const roomCodeInput = document.getElementById('roomCodeInput');
-  const joinBtn = document.getElementById('joinRoomBtn');
+  const joinBtn     = document.getElementById('joinRoomBtn');
+  const botBtn      = document.getElementById('botBtn'); // 🤖 Bot button
 
   createBtn.addEventListener('click', () => {
     const name = nameInput.value.trim();
     if (!name) { showToast('Enter your name first!', 'error'); SoundEngine.play('error'); return; }
     SoundEngine.play('click');
+    isBotGame = false;
     socket.emit('createRoom', { playerName: name });
   });
 
@@ -172,8 +184,20 @@ function initHome() {
     if (!name) { showToast('Enter your name first!', 'error'); SoundEngine.play('error'); return; }
     if (code.length < 4) { showToast('Enter a valid room code!', 'error'); SoundEngine.play('error'); return; }
     SoundEngine.play('click');
+    isBotGame = false;
     socket.emit('joinRoom', { roomCode: code, playerName: name });
   });
+
+  // 🤖 BOT BUTTON
+  if (botBtn) {
+    botBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      if (!name) { showToast('Apna naam enter karo!', 'error'); SoundEngine.play('error'); return; }
+      SoundEngine.play('click');
+      isBotGame = true;
+      socket.emit('createBotRoom', { playerName: name });
+    });
+  }
 
   roomCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') joinBtn.click(); });
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') createBtn.click(); });
@@ -182,7 +206,6 @@ function initHome() {
 // ── Lobby ──────────────────────────────────────────
 function updateLobbySlots() {
   if (!gameState) {
-    // Only our slot is filled initially
     const xName = document.getElementById('slot-x-name');
     const oName = document.getElementById('slot-o-name');
     const xDot  = document.getElementById('slot-x-status');
@@ -210,9 +233,7 @@ function updateLobbySlots() {
   });
 
   const indicator = document.getElementById('waitingIndicator');
-  if (gameState.players.length >= 2) {
-    indicator.classList.add('hidden');
-  }
+  if (gameState.players.length >= 2) indicator.classList.add('hidden');
 }
 
 document.getElementById('copyCodeBtn').addEventListener('click', () => {
@@ -227,45 +248,55 @@ document.getElementById('copyCodeBtn').addEventListener('click', () => {
 
 // ── Game UI Init ───────────────────────────────────
 function initGameUI() {
-  // Board cells
   document.querySelectorAll('.cell').forEach(cell => {
     cell.addEventListener('click', () => {
       const idx = parseInt(cell.dataset.index);
       if (!gameState || gameState.status !== 'playing') return;
-      if (gameState.currentTurn !== mySymbol) return;
       if (gameState.board[idx] !== null) return;
-      SoundEngine.play('move');
-      socket.emit('makeMove', { index: idx });
+
+      if (isBotGame) {
+        // Bot game — sirf apni baari pe move
+        if (gameState.currentTurn !== 'X') return;
+        SoundEngine.play('move');
+        socket.emit('makeBotMove', { index: idx });
+      } else {
+        // Multiplayer — apni symbol ki baari pe
+        if (gameState.currentTurn !== mySymbol) return;
+        SoundEngine.play('move');
+        socket.emit('makeMove', { index: idx });
+      }
     });
   });
 
-  // Panel buttons
   document.getElementById('openChatBtn').addEventListener('click', () => openPanel('chat'));
   document.getElementById('openHistoryBtn').addEventListener('click', () => openPanel('history'));
   document.getElementById('closeChatBtn').addEventListener('click', () => closePanel('chat'));
   document.getElementById('closeHistoryBtn').addEventListener('click', () => closePanel('history'));
   document.getElementById('panelBackdrop').addEventListener('click', closePanels);
 
-  // Chat
   const chatInput = document.getElementById('chatInput');
   document.getElementById('sendChatBtn').addEventListener('click', sendChat);
   chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
   chatInput.addEventListener('input', handleTyping);
 
-  // Rematch
   document.getElementById('rematchBtn').addEventListener('click', () => {
     SoundEngine.play('click');
-    socket.emit('requestRematch');
-    document.getElementById('rematchToast').classList.remove('hidden');
+    lastResultShown = null;
+    if (isBotGame) {
+      socket.emit('requestBotRematch');
+    } else {
+      socket.emit('requestRematch');
+      document.getElementById('rematchToast').classList.remove('hidden');
+    }
     document.getElementById('resultOverlay').classList.add('hidden');
   });
+
   document.getElementById('acceptRematchBtn')?.addEventListener('click', () => {
     SoundEngine.play('click');
     socket.emit('requestRematch');
     document.getElementById('rematchReqToast').style.display = 'none';
   });
 
-  // Leave
   document.getElementById('leaveGameBtn').addEventListener('click', leaveGame);
   document.getElementById('leaveResultBtn').addEventListener('click', leaveGame);
 }
@@ -274,13 +305,9 @@ function initGameUI() {
 function renderGameState(state) {
   if (!state) return;
 
-  // Update lobby slots
   updateLobbySlots();
-
-  // Board
   renderBoard(state.board, state.winLine || []);
 
-  // HUD
   state.players.forEach(p => {
     const sym = p.symbol.toLowerCase();
     const nameEl  = document.getElementById(`hud-${sym}-name`);
@@ -294,24 +321,25 @@ function renderGameState(state) {
     }
   });
 
-  // Turn indicator
-  const turnInd   = document.getElementById('turnIndicator');
-  const turnSym   = document.getElementById('turnSymbol');
-  const turnText  = document.getElementById('turnText');
+  const turnInd  = document.getElementById('turnIndicator');
+  const turnSym  = document.getElementById('turnSymbol');
+  const turnText = document.getElementById('turnText');
 
   if (state.status === 'playing') {
-    const isMyTurn = state.currentTurn === mySymbol;
+    const isMyTurn = isBotGame
+      ? state.currentTurn === 'X'
+      : state.currentTurn === mySymbol;
+
     turnSym.textContent = state.currentTurn === 'X' ? '✕' : '○';
     turnSym.className = `turn-symbol ${state.currentTurn === 'X' ? 'x-sym' : 'o-sym'}`;
-    turnText.textContent = isMyTurn ? 'Your turn' : 'Opponent';
-    turnInd.className = `turn-indicator ${isMyTurn ? (mySymbol === 'X' ? 'active-x' : 'active-o') : ''}`;
+    turnText.textContent = isMyTurn ? 'Your turn' : (isBotGame ? '🤖 Bot soch raha hai...' : 'Opponent');
+    turnInd.className = `turn-indicator ${isMyTurn ? (state.currentTurn === 'X' ? 'active-x' : 'active-o') : ''}`;
   } else if (state.status === 'finished') {
     turnText.textContent = 'Game over';
     turnSym.textContent = state.winner === 'draw' ? '=' : (state.winner === 'X' ? '✕' : '○');
     showResult(state);
   }
 
-  // Match history
   renderHistory(state.matchHistory || []);
 }
 
@@ -342,7 +370,7 @@ function clearBoardUI() {
   });
 }
 
-// ── Result Overlay ─────────────────────────────────
+// ── Result Overlay + MEME TRIGGER ─────────────────
 let lastResultShown = null;
 
 function showResult(state) {
@@ -355,31 +383,46 @@ function showResult(state) {
   const title   = document.getElementById('resultTitle');
   const sub     = document.getElementById('resultSub');
 
+  let memeType = 'draw';
+
   if (state.winner === 'draw') {
     icon.textContent  = '🤝';
     title.textContent = "It's a Draw!";
     title.style.color = 'var(--text-secondary)';
-    sub.textContent   = 'Nobody wins this round.';
+    sub.textContent   = 'Dono barabar nikle!';
     SoundEngine.play('draw');
+    memeType = 'draw';
   } else {
     const winnerPlayer = state.players.find(p => p.symbol === state.winner);
-    const isMe = state.winner === mySymbol;
+
+    // Bot game mein X hamesha player hai
+    const isMe = isBotGame
+      ? state.winner === 'X'
+      : state.winner === mySymbol;
+
     if (isMe) {
       icon.textContent  = '🏆';
       title.textContent = 'You Win!';
-      title.style.color = mySymbol === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-      sub.textContent   = `Excellent move, ${myName}!`;
+      title.style.color = state.winner === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+      sub.textContent   = isBotGame ? 'Bot ko haara diya! 🤖💀' : `Excellent move, ${myName}!`;
       SoundEngine.play('win');
+      memeType = 'win';
     } else {
       icon.textContent  = '😔';
-      title.textContent = 'You Lose!';
+      title.textContent = isBotGame ? 'Bot Jeet Gaya! 🤖' : 'You Lose!';
       title.style.color = 'var(--text-secondary)';
-      sub.textContent   = `${winnerPlayer?.name || 'Opponent'} wins this round.`;
+      sub.textContent   = isBotGame ? 'Bot ne tujhe dhoya bhai 💀' : `${winnerPlayer?.name || 'Opponent'} wins this round.`;
       SoundEngine.play('lose');
+      memeType = 'lose';
     }
   }
 
   overlay.classList.remove('hidden');
+
+  // 🎭 MEME POPUP — 1.2 sec baad taaki result card pehle dikhe
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('gameResult', { detail: { type: memeType } }));
+  }, 1200);
 }
 
 // ── Player Status Update ───────────────────────────
@@ -505,7 +548,7 @@ function formatTime(ts) {
 // ── Panel Management ───────────────────────────────
 function openPanel(which) {
   closePanels();
-  const panel   = document.getElementById(which + 'Panel');
+  const panel    = document.getElementById(which + 'Panel');
   const backdrop = document.getElementById('panelBackdrop');
   panel.classList.add('open');
   backdrop.classList.remove('hidden');
@@ -555,17 +598,4 @@ function showToast(message, type = 'info', duration = 2500) {
   toast.className = `toast ${type}`;
   toast.textContent = message;
   container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.animation = 'toastOut 0.3s ease forwards';
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
-}
-
-// ── Start ──────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  showScreen('loading');
-  runLoadingScreen();
-  initHome();
-});
-
-})();
+  setTimeout(() => 
