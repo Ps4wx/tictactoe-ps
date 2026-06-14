@@ -72,6 +72,55 @@ function generateRoomCode() {
   return code;
 }
 
+// ─── BOT AI (Minimax) ────────────────────────────────────────────────────────
+function minimax(board, isMaximizing, botSymbol, humanSymbol) {
+  const result = checkWinner(board);
+  if (result) {
+    if (result.winner === botSymbol) return 10;
+    if (result.winner === humanSymbol) return -10;
+    return 0; // draw
+  }
+
+  if (isMaximizing) {
+    let best = -Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = botSymbol;
+        best = Math.max(best, minimax(board, false, botSymbol, humanSymbol));
+        board[i] = null;
+      }
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = humanSymbol;
+        best = Math.min(best, minimax(board, true, botSymbol, humanSymbol));
+        board[i] = null;
+      }
+    }
+    return best;
+  }
+}
+
+function getBotMove(board, botSymbol, humanSymbol) {
+  let bestScore = -Infinity;
+  let bestMove = -1;
+  for (let i = 0; i < 9; i++) {
+    if (!board[i]) {
+      board[i] = botSymbol;
+      const score = minimax(board, false, botSymbol, humanSymbol);
+      board[i] = null;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = i;
+      }
+    }
+  }
+  return bestMove;
+}
+
 // ─── Socket.IO events ───────────────────────────────────────────────────────
 io.on('connection', socket => {
   console.log('Connected:', socket.id);
@@ -105,7 +154,7 @@ io.on('connection', socket => {
     }
     const room = rooms[code];
 
-    // Rejoin check: same name already in room but disconnected
+    // Rejoin check
     const existing = room.players.find(p => p.name === name);
     if (existing && !existing.connected) {
       existing.id = socket.id;
@@ -147,7 +196,7 @@ io.on('connection', socket => {
     console.log(`${name} joined room ${code}`);
   });
 
-  // ── Make Move ──
+  // ── Make Move (Multiplayer) ──
   socket.on('makeMove', ({ index }) => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
@@ -172,9 +221,6 @@ io.on('connection', socket => {
         if (winner) winner.score += 1;
       }
 
-      // Add to match history
-      const p0 = room.players[0];
-      const p1 = room.players[1];
       room.matchHistory.unshift({
         id: uuidv4(),
         winner: result.winner === 'draw' ? 'Draw' : room.players.find(p => p.symbol === result.winner)?.name,
@@ -189,7 +235,7 @@ io.on('connection', socket => {
     io.to(code).emit('gameState', getRoomState(room));
   });
 
-  // ── Rematch ──
+  // ── Rematch (Multiplayer) ──
   socket.on('requestRematch', () => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
@@ -201,18 +247,16 @@ io.on('connection', socket => {
     room.rematchVotes.add(socket.id);
 
     if (room.rematchVotes.size >= 2) {
-      // Reset board, swap first turn
       room.board = Array(9).fill(null);
       room.status = 'playing';
       room.winner = null;
       room.winLine = [];
-      room.currentTurn = room.currentTurn === 'X' ? 'O' : 'X'; // loser/other goes first
+      room.currentTurn = room.currentTurn === 'X' ? 'O' : 'X';
       room.rematchVotes = new Set();
       io.to(code).emit('gameState', getRoomState(room));
       io.to(code).emit('rematchStarted');
       io.to(code).emit('chatMessage', { system: true, text: 'Rematch started!', ts: Date.now() });
     } else {
-      // Notify opponent
       io.to(code).emit('rematchRequested', { from: player.name });
     }
   });
@@ -242,11 +286,139 @@ io.on('connection', socket => {
     socket.to(code).emit('opponentTyping', { name: player.name, isTyping });
   });
 
-  // ── Disconnect ──
+  // ════════════════════════════════════════════════════
+  // ── BOT GAME EVENTS ──────────────────────────────────
+  // ════════════════════════════════════════════════════
+
+  // Player "vs Bot" select karta hai
+  socket.on('createBotRoom', ({ playerName }) => {
+    const name = (playerName || 'Player').trim().slice(0, 20);
+    const code = 'BOT_' + socket.id.slice(0, 8);
+
+    const room = {
+      code,
+      isBot: true,
+      players: [
+        { id: socket.id, name, symbol: 'X', score: 0, connected: true },
+        { id: 'BOT', name: '🤖 Bot', symbol: 'O', score: 0, connected: true }
+      ],
+      board: Array(9).fill(null),
+      currentTurn: 'X',
+      status: 'playing',
+      winner: null,
+      winLine: [],
+      matchHistory: []
+    };
+
+    rooms[code] = room;
+    socket.join(code);
+    socket.roomCode = code;
+    socket.playerName = name;
+
+    socket.emit('roomJoined', { roomCode: code, symbol: 'X', playerName: name, isBot: true });
+    socket.emit('gameState', getRoomState(room));
+    socket.emit('chatMessage', {
+      system: true,
+      text: `Game vs Bot started! ${name} (X) goes first.`,
+      ts: Date.now()
+    });
+
+    console.log(`Bot room created for ${name}`);
+  });
+
+  // Player ka move (bot game mein bhi same 'makeMove' use hoga)
+  // Isliye makeMove ko modify kiya hai — bot room detect hoga
+  // Upar wala makeMove already handle karta hai human ka move
+  // Neeche bot ka auto-response add kiya hai:
+
+  socket.on('makeBotMove', ({ index }) => {
+    const code = socket.roomCode;
+    if (!code || !rooms[code]) return;
+    const room = rooms[code];
+    if (!room.isBot) return;
+    if (room.status !== 'playing') return;
+    if (room.board[index] !== null) return;
+    if (room.currentTurn !== 'X') return; // sirf human ki baari pe
+
+    // Human ka move
+    room.board[index] = 'X';
+    let result = checkWinner(room.board);
+
+    if (result) {
+      room.status = 'finished';
+      room.winner = result.winner;
+      room.winLine = result.line;
+      if (result.winner === 'X') room.players[0].score += 1;
+      room.matchHistory.unshift({
+        id: uuidv4(),
+        winner: result.winner === 'draw' ? 'Draw' : result.winner === 'X' ? room.players[0].name : '🤖 Bot',
+        board: [...room.board],
+        ts: Date.now()
+      });
+      socket.emit('gameState', getRoomState(room));
+      return;
+    }
+
+    room.currentTurn = 'O';
+    socket.emit('gameState', getRoomState(room)); // board update dikhao
+
+    // Bot ka move — 600ms delay (natural lagta hai)
+    setTimeout(() => {
+      if (room.status !== 'playing') return;
+
+      const botIndex = getBotMove([...room.board], 'O', 'X');
+      room.board[botIndex] = 'O';
+      result = checkWinner(room.board);
+
+      if (result) {
+        room.status = 'finished';
+        room.winner = result.winner;
+        room.winLine = result.line;
+        if (result.winner === 'O') room.players[1].score += 1;
+        room.matchHistory.unshift({
+          id: uuidv4(),
+          winner: result.winner === 'draw' ? 'Draw' : '🤖 Bot',
+          board: [...room.board],
+          ts: Date.now()
+        });
+      } else {
+        room.currentTurn = 'X';
+      }
+
+      socket.emit('gameState', getRoomState(room));
+    }, 600);
+  });
+
+  // Bot Rematch
+  socket.on('requestBotRematch', () => {
+    const code = socket.roomCode;
+    if (!code || !rooms[code]) return;
+    const room = rooms[code];
+    if (!room.isBot) return;
+
+    room.board = Array(9).fill(null);
+    room.status = 'playing';
+    room.winner = null;
+    room.winLine = [];
+    room.currentTurn = 'X';
+
+    socket.emit('gameState', getRoomState(room));
+    socket.emit('rematchStarted');
+    socket.emit('chatMessage', { system: true, text: 'New game started! You go first.', ts: Date.now() });
+  });
+
+  // ─── Disconnect ──────────────────────────────────────
   socket.on('disconnect', () => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
+
+    if (room.isBot) {
+      // Bot room turant delete
+      delete rooms[code];
+      return;
+    }
+
     const player = room.players.find(p => p.id === socket.id);
     if (player) {
       player.connected = false;
@@ -254,7 +426,6 @@ io.on('connection', socket => {
       io.to(code).emit('gameState', getRoomState(room));
       io.to(code).emit('chatMessage', { system: true, text: `${player.name} disconnected.`, ts: Date.now() });
 
-      // Clean up empty rooms after 10 minutes
       setTimeout(() => {
         if (rooms[code] && room.players.every(p => !p.connected)) {
           delete rooms[code];
@@ -271,3 +442,4 @@ app.get('/health', (_, res) => res.json({ status: 'ok', rooms: Object.keys(rooms
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+      
