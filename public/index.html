@@ -8,8 +8,103 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+
+  <style>
+    /* ── MEME POPUP ─────────────────────────────────── */
+    #memeOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(6px);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      animation: memeFadeIn 0.3s ease;
+    }
+    #memeOverlay.show { display: flex; }
+
+    @keyframes memeFadeIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .meme-box {
+      background: #0f0f1a;
+      border: 2px solid #fff200;
+      border-radius: 20px;
+      padding: 24px 20px 20px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(255,242,0,0.3);
+      position: relative;
+    }
+
+    .meme-gif {
+      width: 100%;
+      max-height: 220px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      border: 2px solid #333;
+    }
+
+    .meme-headline {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: #fff200;
+      margin-bottom: 8px;
+      line-height: 1.3;
+      text-shadow: 0 0 12px rgba(255,242,0,0.5);
+    }
+
+    .meme-sub {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.95rem;
+      color: #ccc;
+      margin-bottom: 18px;
+    }
+
+    .meme-close-btn {
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 28px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: transform 0.15s;
+    }
+    .meme-close-btn:hover { transform: scale(1.05); }
+
+    .meme-emoji-rain {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      animation: emojiShake 0.5s ease infinite alternate;
+    }
+    @keyframes emojiShake {
+      from { transform: rotate(-8deg) scale(1); }
+      to   { transform: rotate(8deg) scale(1.15); }
+    }
+  </style>
 </head>
 <body>
+
+<!-- ═══════════ MEME OVERLAY ═══════════ -->
+<div id="memeOverlay">
+  <div class="meme-box">
+    <div class="meme-emoji-rain" id="memeEmoji">🏆</div>
+    <img class="meme-gif" id="memeGif" src="" alt="meme" />
+    <div class="meme-headline" id="memeHeadline">TU JEET GAYA!</div>
+    <div class="meme-sub" id="memeSub">Kya scene hai bhai 🔥</div>
+    <button class="meme-close-btn" id="memeCloseBtn">OK BHAI ✓</button>
+  </div>
+</div>
 
 <!-- ═══════════ LOADING SCREEN ═══════════ -->
 <div id="loadingScreen" class="screen active">
@@ -221,5 +316,107 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/game.js"></script>
+
+<!-- ═══════════ MEME LOGIC ═══════════ -->
+<script>
+  // ── WIN memes ──
+  const WIN_MEMES = [
+    {
+      gif: 'https://media.tenor.com/LDSEECmMkTsAAAAC/cat-dancing.gif',
+      headline: '🔥 TERI MAA KI AANKH TU JEET GAYA! 🔥',
+      sub: 'Opponent ne controller phaink diya hoga 💀'
+    },
+    {
+      gif: 'https://media.tenor.com/beFLDPreQEIAAAAC/john-cena-you-cant-see-me.gif',
+      headline: 'BHAI TU TOH PRO NIKLA! 😤',
+      sub: 'Seedha national team mein bhej inhe 🏆'
+    },
+    {
+      gif: 'https://media.tenor.com/6Nl_oeJJqUcAAAAC/minions-celebrating.gif',
+      headline: 'W MAAR DIYA EKDUM! 🎉',
+      sub: 'Opponent abhi ro raha hoga ghar pe 😂'
+    },
+    {
+      gif: 'https://media.tenor.com/Ie1bpNhToIoAAAAC/party-celebration.gif',
+      headline: 'LEGEND HAI TU BHAI! 👑',
+      sub: 'Opponent ka WiFi accha nahi tha shayad 😅'
+    }
+  ];
+
+  // ── LOSE memes ──
+  const LOSE_MEMES = [
+    {
+      gif: 'https://media.tenor.com/lZOGTbMFtv0AAAAC/this-is-fine-dog.gif',
+      headline: 'HAAR GAYA? YE THEEK HAI... 😶🔥',
+      sub: 'Sab theek hai. Bilkul theek hai. 💀'
+    },
+    {
+      gif: 'https://media.tenor.com/G2-jIeNdL_kAAAAC/crying-cry.gif',
+      headline: 'BHAI SEEDHA SO JA AB 😭',
+      sub: 'Kal naya din, naya chance. Aaj toh gaya 💀'
+    },
+    {
+      gif: 'https://media.tenor.com/5F2MEs1-8bsAAAAC/why-crying.gif',
+      headline: 'RO MAT BHAI... 😂',
+      sub: 'Actually... ro le thoda. Better lagega 🥲'
+    },
+    {
+      gif: 'https://media.tenor.com/Un-h_niGCPkAAAAC/michael-scott-no.gif',
+      headline: 'NOOOOOO! 😱',
+      sub: 'Yahi toh duniya hai bhai. Chalte raho 🚶'
+    }
+  ];
+
+  // ── DRAW memes ──
+  const DRAW_MEMES = [
+    {
+      gif: 'https://media.tenor.com/URTJZ7Bj8WMAAAAC/spider-man-pointing.gif',
+      headline: 'DONO EQUAL BEKAR NIKLE! 🤝',
+      sub: 'Yaar koi nahi jeeta... koi nahi hara. Sad life 😐'
+    },
+    {
+      gif: 'https://media.tenor.com/YNi4sTb3EncAAAAC/handshake-shake.gif',
+      headline: 'DRAW? REALLY? 😶',
+      sub: 'Dono ne milke game waste kar diya 💀'
+    }
+  ];
+
+  function getRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function showMeme(type) {
+    let meme;
+    let emoji;
+    if (type === 'win') {
+      meme = getRandom(WIN_MEMES);
+      emoji = '🏆🎉🔥';
+    } else if (type === 'lose') {
+      meme = getRandom(LOSE_MEMES);
+      emoji = '💀😭🥲';
+    } else {
+      meme = getRandom(DRAW_MEMES);
+      emoji = '🤝😐💀';
+    }
+
+    document.getElementById('memeEmoji').textContent = emoji;
+    document.getElementById('memeGif').src = meme.gif;
+    document.getElementById('memeHeadline').textContent = meme.headline;
+    document.getElementById('memeSub').textContent = meme.sub;
+    document.getElementById('memeOverlay').classList.add('show');
+  }
+
+  document.getElementById('memeCloseBtn').addEventListener('click', () => {
+    document.getElementById('memeOverlay').classList.remove('show');
+  });
+
+  // ── game.js ke result se meme trigger karo ──
+  // game.js mein jab result aata hai wahan se window event fire hoga
+  window.addEventListener('gameResult', (e) => {
+    const { type } = e.detail; // 'win' | 'lose' | 'draw'
+    setTimeout(() => showMeme(type), 800); // thodi delay — result card pehle dikhe
+  });
+</script>
+
 </body>
 </html>
