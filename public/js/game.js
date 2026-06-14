@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  TicTacToe PS — Client Game Logic (with Bot + Memes)
+//  TicTacToe PS — Client Game Logic (FIXED)
 // ═══════════════════════════════════════════════════
 
 (() => {
@@ -16,7 +16,8 @@ let historyOpen = false;
 let unreadChats = 0;
 let typingTimer = null;
 let isTyping = false;
-let isBotGame = false;  // BOT MODE FLAG
+let isBotGame = false;
+let lastResultShown = null;
 
 // ── Screens ────────────────────────────────────────
 const screens = {
@@ -35,12 +36,7 @@ function showScreen(name) {
 function runLoadingScreen() {
   const bar = document.getElementById('loadingBar');
   const text = document.getElementById('loadingText');
-  const messages = [
-    'Initializing game...',
-    'Loading assets...',
-    'Connecting to server...',
-    'Ready!'
-  ];
+  const messages = ['Initializing game...', 'Loading assets...', 'Connecting to server...', 'Ready!'];
   let progress = 0;
   let msgIdx = 0;
 
@@ -55,6 +51,7 @@ function runLoadingScreen() {
       text.textContent = 'Ready!';
       setTimeout(() => {
         initSocket();
+        initHome();       // ← FIX: initHome yahan call hota hai
         showScreen('home');
       }, 500);
     }
@@ -85,7 +82,6 @@ function initSocket() {
     isBotGame = !!isBot;
 
     if (isBotGame) {
-      // Bot game — seedha game screen pe
       showScreen('game');
       initGameUI();
     } else {
@@ -131,10 +127,10 @@ function initSocket() {
     }
   });
 
-  socket.on('opponentTyping', ({ name, isTyping }) => {
+  socket.on('opponentTyping', ({ name, isTyping: t }) => {
     const el = document.getElementById('typingIndicator');
     document.getElementById('typingName').textContent = name;
-    el.classList.toggle('hidden', !isTyping);
+    el.classList.toggle('hidden', !t);
   });
 
   socket.on('rematchRequested', ({ from }) => {
@@ -156,13 +152,13 @@ function initSocket() {
 
 // ── Home Screen ────────────────────────────────────
 function initHome() {
-  const nameInput   = document.getElementById('playerNameInput');
-  const createBtn   = document.getElementById('createRoomBtn');
-  const showJoinBtn = document.getElementById('showJoinBtn');
-  const joinPanel   = document.getElementById('joinPanel');
+  const nameInput     = document.getElementById('playerNameInput');
+  const createBtn     = document.getElementById('createRoomBtn');
+  const showJoinBtn   = document.getElementById('showJoinBtn');
+  const joinPanel     = document.getElementById('joinPanel');
   const roomCodeInput = document.getElementById('roomCodeInput');
-  const joinBtn     = document.getElementById('joinRoomBtn');
-  const botBtn      = document.getElementById('botBtn'); // 🤖 Bot button
+  const joinBtn       = document.getElementById('joinRoomBtn');
+  const botBtn        = document.getElementById('botBtn');
 
   createBtn.addEventListener('click', () => {
     const name = nameInput.value.trim();
@@ -188,7 +184,6 @@ function initHome() {
     socket.emit('joinRoom', { roomCode: code, playerName: name });
   });
 
-  // 🤖 BOT BUTTON
   if (botBtn) {
     botBtn.addEventListener('click', () => {
       const name = nameInput.value.trim();
@@ -209,15 +204,14 @@ function updateLobbySlots() {
     const xName = document.getElementById('slot-x-name');
     const oName = document.getElementById('slot-o-name');
     const xDot  = document.getElementById('slot-x-status');
-    const oDot  = document.getElementById('slot-o-status');
 
     if (mySymbol === 'X') {
       xName.textContent = myName;
       xDot.classList.add('online');
       oName.textContent = 'Waiting...';
     } else {
-      oName.textContent = myName;
-      oDot.classList.add('online');
+      document.getElementById('slot-o-name').textContent = myName;
+      document.getElementById('slot-o-status').classList.add('online');
     }
     return;
   }
@@ -247,7 +241,12 @@ document.getElementById('copyCodeBtn').addEventListener('click', () => {
 });
 
 // ── Game UI Init ───────────────────────────────────
+let gameUIInited = false;
+
 function initGameUI() {
+  if (gameUIInited) return;   // ← FIX: double-bind prevent karo
+  gameUIInited = true;
+
   document.querySelectorAll('.cell').forEach(cell => {
     cell.addEventListener('click', () => {
       const idx = parseInt(cell.dataset.index);
@@ -255,12 +254,10 @@ function initGameUI() {
       if (gameState.board[idx] !== null) return;
 
       if (isBotGame) {
-        // Bot game — sirf apni baari pe move
         if (gameState.currentTurn !== 'X') return;
         SoundEngine.play('move');
         socket.emit('makeBotMove', { index: idx });
       } else {
-        // Multiplayer — apni symbol ki baari pe
         if (gameState.currentTurn !== mySymbol) return;
         SoundEngine.play('move');
         socket.emit('makeMove', { index: idx });
@@ -291,11 +288,14 @@ function initGameUI() {
     document.getElementById('resultOverlay').classList.add('hidden');
   });
 
-  document.getElementById('acceptRematchBtn')?.addEventListener('click', () => {
-    SoundEngine.play('click');
-    socket.emit('requestRematch');
-    document.getElementById('rematchReqToast').style.display = 'none';
-  });
+  const acceptBtn = document.getElementById('acceptRematchBtn');
+  if (acceptBtn) {
+    acceptBtn.addEventListener('click', () => {
+      SoundEngine.play('click');
+      socket.emit('requestRematch');
+      document.getElementById('rematchReqToast').style.display = 'none';
+    });
+  }
 
   document.getElementById('leaveGameBtn').addEventListener('click', leaveGame);
   document.getElementById('leaveResultBtn').addEventListener('click', leaveGame);
@@ -326,13 +326,10 @@ function renderGameState(state) {
   const turnText = document.getElementById('turnText');
 
   if (state.status === 'playing') {
-    const isMyTurn = isBotGame
-      ? state.currentTurn === 'X'
-      : state.currentTurn === mySymbol;
-
+    const isMyTurn = isBotGame ? state.currentTurn === 'X' : state.currentTurn === mySymbol;
     turnSym.textContent = state.currentTurn === 'X' ? '✕' : '○';
     turnSym.className = `turn-symbol ${state.currentTurn === 'X' ? 'x-sym' : 'o-sym'}`;
-    turnText.textContent = isMyTurn ? 'Your turn' : (isBotGame ? '🤖 Bot soch raha hai...' : 'Opponent');
+    turnText.textContent = isMyTurn ? 'Your turn' : (isBotGame ? '🤖 Bot soch raha hai...' : "Opponent's turn");
     turnInd.className = `turn-indicator ${isMyTurn ? (state.currentTurn === 'X' ? 'active-x' : 'active-o') : ''}`;
   } else if (state.status === 'finished') {
     turnText.textContent = 'Game over';
@@ -350,15 +347,8 @@ function renderBoard(board, winLine) {
     const val = board[i];
     cell.textContent = '';
     cell.className = 'cell';
-
-    if (val === 'X') {
-      cell.textContent = '✕';
-      cell.classList.add('x-cell', 'filled');
-    } else if (val === 'O') {
-      cell.textContent = '○';
-      cell.classList.add('o-cell', 'filled');
-    }
-
+    if (val === 'X') { cell.textContent = '✕'; cell.classList.add('x-cell', 'filled'); }
+    else if (val === 'O') { cell.textContent = '○'; cell.classList.add('o-cell', 'filled'); }
     if (winLine.includes(i)) cell.classList.add('win-cell');
   });
 }
@@ -370,9 +360,7 @@ function clearBoardUI() {
   });
 }
 
-// ── Result Overlay + MEME TRIGGER ─────────────────
-let lastResultShown = null;
-
+// ── Result Overlay ─────────────────────────────────
 function showResult(state) {
   const resultKey = state.winner + '-' + (state.matchHistory?.[0]?.id || '');
   if (lastResultShown === resultKey) return;
@@ -394,11 +382,7 @@ function showResult(state) {
     memeType = 'draw';
   } else {
     const winnerPlayer = state.players.find(p => p.symbol === state.winner);
-
-    // Bot game mein X hamesha player hai
-    const isMe = isBotGame
-      ? state.winner === 'X'
-      : state.winner === mySymbol;
+    const isMe = isBotGame ? state.winner === 'X' : state.winner === mySymbol;
 
     if (isMe) {
       icon.textContent  = '🏆';
@@ -419,13 +403,12 @@ function showResult(state) {
 
   overlay.classList.remove('hidden');
 
-  // 🎭 MEME POPUP — 1.2 sec baad taaki result card pehle dikhe
   setTimeout(() => {
     window.dispatchEvent(new CustomEvent('gameResult', { detail: { type: memeType } }));
   }, 1200);
 }
 
-// ── Player Status Update ───────────────────────────
+// ── Player Status ──────────────────────────────────
 function updatePlayerStatus() {
   if (!gameState) return;
   gameState.players.forEach(p => {
@@ -501,7 +484,7 @@ function updateChatBadge() {
   }
 }
 
-// ── Match History ──────────────────────────────────
+// ── History ────────────────────────────────────────
 function renderHistory(history) {
   const list = document.getElementById('historyList');
   list.innerHTML = '';
@@ -541,11 +524,10 @@ function renderHistory(history) {
 
 function formatTime(ts) {
   if (!ts) return '';
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// ── Panel Management ───────────────────────────────
+// ── Panels ─────────────────────────────────────────
 function openPanel(which) {
   closePanels();
   const panel    = document.getElementById(which + 'Panel');
@@ -569,8 +551,7 @@ function openPanel(which) {
 }
 
 function closePanel(which) {
-  const panel = document.getElementById(which + 'Panel');
-  panel.classList.remove('open');
+  document.getElementById(which + 'Panel').classList.remove('open');
   document.getElementById('panelBackdrop').classList.add('hidden');
   if (which === 'chat') chatOpen = false;
   if (which === 'history') historyOpen = false;
@@ -591,11 +572,17 @@ function leaveGame() {
   location.reload();
 }
 
-// ── Toast Notifications ────────────────────────────
+// ── Toast ──────────────────────────────────────────
 function showToast(message, type = 'info', duration = 2500) {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = message;
   container.appendChild(toast);
-  setTimeout(() => 
+  setTimeout(() => {
+    toast.style.animation = 'toastOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// ── START ───────────────────
